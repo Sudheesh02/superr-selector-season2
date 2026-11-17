@@ -1,0 +1,5 @@
+model_variant,hp_deliveries,hp_share_pct,qualified_batters,top10_bat_overlap,spearman_r_batters,qualified_bowlers,top10_bowl_overlap,spearman_r_bowlers
+"Model A (Primary): Elite IPL+FM, PI >= 45",32182,17.68,42,10 / 10 (Baseline),1.0,67,10 / 10 (Baseline),1.0
+"Model B: All Matches (incl. Associate/Emerging), PI >= 45",35920,17.87,46,8 / 10,0.9948,70,9 / 10,0.9968
+"Model C: Stricter Threshold (Elite, PI >= 50, min 120 HP)",21530,11.83,29,6 / 10,0.6889,50,5 / 10,0.7656
+Model D: Temporal Split (2022-mid24 vs mid24-26 EB HP Impact),32182,17.68,30,Out-of-Sample,0.1488,48,Out-of-Sample,0.4684
