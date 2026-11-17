@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SupeRR Selector S2 | Clutch Player Analytics Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #0F172A; }
+    .rr-grad { background: linear-gradient(135deg, #1E1656 0%, #3B1D7A 60%, #E11D74 100%); }
+    .card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 1px 3px rgba(15,23,42,0.04); }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="rr-grad text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-pink-200">
+          <span>Rajasthan Royals</span>
+          <span>•</span>
+          <span>SupeRR Selector Season 2 (Round 1)</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">
+          Clutch Player Intelligence Dashboard
+        </h1>
+        <p class="text-sm text-indigo-100 mt-1">
+          Win-Probability Leverage (PI ≥ 45) &amp; Empirical Bayes Net Run Impact across 200,999 IPL &amp; T20I Deliveries (2022–2026)
+        </p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/Sudheesh02/superr-selector-season2" target="_blank"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-semibold transition border border-white/20">
+          <span>GitHub Repo</span>
+          <span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- KPI Strip -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card p-4">
+        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Deliveries Audited</div>
+        <div class="text-2xl font-extrabold text-[#1E1656] mt-1">200,999</div>
+        <div class="text-xs text-slate-500 mt-1">784 Elite IPL &amp; Full-Member T20Is</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">2nd-Inn Win-Prob AUC</div>
+        <div class="text-2xl font-extrabold text-[#E11D74] mt-1">0.9031</div>
+        <div class="text-xs text-slate-500 mt-1">Brier 0.1263 • Garbage time filtered</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">High-Pressure Leverage</div>
+        <div class="text-2xl font-extrabold text-teal-700 mt-1">2.52x</div>
+        <div class="text-xs text-slate-500 mt-1">0.211 vs 0.084 • +31.9% Wicket Prob</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Qualified Pool</div>
+        <div class="text-2xl font-extrabold text-[#1E1656] mt-1">42 Bat • 67 Bowl</div>
+        <div class="text-xs text-slate-500 mt-1">≥150 HP balls • ≥300 Norm • ≥12 Matches</div>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <section class="card p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="inline-flex rounded-xl bg-slate-100 p-1 w-fit">
+        <button id="btn-bat" onclick="setRole('batters')"
+          class="px-4 py-2 rounded-lg text-sm font-bold transition bg-[#1E1656] text-white shadow-sm">
+          Batters (42)
+        </button>
+        <button id="btn-bowl" onclick="setRole('bowlers')"
+          class="px-4 py-2 rounded-lg text-sm font-bold transition text-slate-600 hover:text-slate-900">
+          Bowlers (67)
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex items-center gap-2">
+          <label for="search-input" class="text-xs font-semibold uppercase text-slate-500">Search</label>
+          <input id="search-input" type="text" placeholder="Player name..."
+            oninput="renderAll()"
+            class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E11D74]" />
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="min-balls" class="text-xs font-semibold uppercase text-slate-500">
+            Min HP Balls: <span id="min-balls-val" class="text-[#1E1656] font-bold">150</span>
+          </label>
+          <input id="min-balls" type="range" min="150" max="400" step="10" value="150"
+            oninput="document.getElementById('min-balls-val').textContent=this.value; renderAll();"
+            class="accent-[#E11D74]" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Grid: Quadrant + Spotlight -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="card p-4 lg:col-span-2">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <h2 id="chart-title" class="text-base font-bold text-[#1E1656]">Normal Baseline vs. High-Pressure Impact</h2>
+            <p class="text-xs text-slate-500">Bubble size = HP balls • Color = Positive HP Match % • Click any point to inspect</p>
+          </div>
+        </div>
+        <div id="quadrant-plot" class="w-full h-[430px]"></div>
+      </div>
+
+      <!-- Player Spotlight -->
+      <div class="card p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-pink-50 text-[#E11D74] border border-pink-200">
+              Player Spotlight
+            </span>
+            <span id="sp-rank" class="text-sm font-extrabold text-[#1E1656]">#1</span>
+          </div>
+          <h3 id="sp-name" class="text-xl font-extrabold text-slate-900 mt-3">Shreyas Iyer</h3>
+          <p id="sp-sub" class="text-xs text-slate-500 mt-0.5">265 HP balls • 17 Qualifying HP Matches</p>
+
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div class="text-[11px] font-semibold text-slate-500 uppercase">Clutch Score</div>
+              <div id="sp-score" class="text-xl font-extrabold text-[#1E1656] mt-0.5">82.18</div>
+            </div>
+            <div class="p-3 rounded-xl bg-teal-50 border border-teal-200">
+              <div class="text-[11px] font-semibold text-teal-700 uppercase">Pos HP Match %</div>
+              <div id="sp-pos" class="text-xl font-extrabold text-teal-800 mt-0.5">82.35%</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div id="sp-norm-lbl" class="text-[11px] font-semibold text-slate-500 uppercase">Normal SR</div>
+              <div id="sp-norm-val" class="text-lg font-bold text-slate-800 mt-0.5">149.18</div>
+            </div>
+            <div class="p-3 rounded-xl bg-pink-50 border border-pink-200">
+              <div id="sp-hp-lbl" class="text-[11px] font-semibold text-[#E11D74] uppercase">High-Pressure SR</div>
+              <div id="sp-hp-val" class="text-lg font-bold text-[#E11D74] mt-0.5">177.74</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div class="text-[11px] font-semibold text-slate-500 uppercase">EB Norm Impact</div>
+              <div id="sp-eb-norm" class="text-lg font-bold text-slate-800 mt-0.5">+8.54</div>
+            </div>
+            <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+              <div class="text-[11px] font-semibold text-[#1E1656] uppercase">EB HP Impact</div>
+              <div id="sp-eb-hp" class="text-lg font-bold text-[#1E1656] mt-0.5">+37.43</div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
+          Click any row in the leaderboard below or any bubble in the quadrant to update this card.
+        </div>
+      </div>
+    </section>
+
+    <!-- Leaderboard Table -->
+    <section class="card overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h2 id="table-title" class="text-base font-bold text-[#1E1656]">Qualified Batters Leaderboard</h2>
+        <span id="table-count" class="text-xs font-semibold text-slate-500">Showing 42 players</span>
+      </div>
+      <div class="overflow-x-auto max-h-[420px]">
+        <table class="w-full text-sm text-left">
+          <thead class="bg-slate-50 text-xs uppercase text-slate-600 sticky top-0 border-b border-slate-200">
+            <tr id="table-head"></tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Validation & Sensitivity -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-5">
+        <h2 class="text-base font-bold text-[#1E1656] mb-3">Empirical Pressure Validation (PI ≥ 45)</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-50 text-slate-600 uppercase border-b">
+              <tr>
+                <th class="py-2 px-3">Context Tier</th>
+                <th class="py-2 px-3">Balls</th>
+                <th class="py-2 px-3">Share</th>
+                <th class="py-2 px-3">RPO</th>
+                <th class="py-2 px-3">Wkt %</th>
+              </tr>
+            </thead>
+            <tbody id="val-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card p-5">
+        <h2 class="text-base font-bold text-[#1E1656] mb-3">Sensitivity &amp; Temporal Reliability</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-50 text-slate-600 uppercase border-b">
+              <tr>
+                <th class="py-2 px-3">Model Variant</th>
+                <th class="py-2 px-3">Bat r</th>
+                <th class="py-2 px-3">Bowl r</th>
+                <th class="py-2 px-3">Top-10 Overlap</th>
+              </tr>
+            </thead>
+            <tbody id="sens-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-center text-xs text-slate-500">
+    Built by Sudheesh Singh for Rajasthan Royals — SupeRR Selector Season 2 (Round 1) •
+    <a href="https://github.com/Sudheesh02/superr-selector-season2" class="text-[#E11D74] font-semibold hover:underline">github.com/Sudheesh02/superr-selector-season2</a>
+  </footer>
+
+  <script>
+    let DATA = null;
+    let ROLE = 'batters';
+    let SELECTED_NAME = null;
+
+    async function init() {
+      const res = await fetch('dashboard_data.json');
+      DATA = await res.json();
+      renderStaticTables();
+      renderAll();
+    }
+
+    function setRole(role) {
+      ROLE = role;
+      SELECTED_NAME = null;
+      document.getElementById('btn-bat').className = role === 'batters'
+        ? 'px-4 py-2 rounded-lg text-sm font-bold transition bg-[#1E1656] text-white shadow-sm'
+        : 'px-4 py-2 rounded-lg text-sm font-bold transition text-slate-600 hover:text-slate-900';
+      document.getElementById('btn-bowl').className = role === 'bowlers'
+        ? 'px-4 py-2 rounded-lg text-sm font-bold transition bg-[#1E1656] text-white shadow-sm'
+        : 'px-4 py-2 rounded-lg text-sm font-bold transition text-slate-600 hover:text-slate-900';
+      renderAll();
+    }
+
+    function renderStaticTables() {
+      const valBody = document.getElementById('val-body');
+      valBody.innerHTML = DATA.validation.map(r => `
+        <tr class="${r.is_hp ? 'bg-pink-50/60 font-semibold' : ''}">
+          <td class="py-2 px-3">${r.context_tier}</td>
+          <td class="py-2 px-3">${Number(r.total_balls).toLocaleString()}</td>
+          <td class="py-2 px-3">${r.share_of_dataset_pct.toFixed(2)}%</td>
+          <td class="py-2 px-3">${r.run_rate_rpo.toFixed(2)}</td>
+          <td class="py-2 px-3">${r.wicket_prob_pct.toFixed(2)}%</td>
+        </tr>
+      `).join('');
+
+      const sensBody = document.getElementById('sens-body');
+      sensBody.innerHTML = DATA.sensitivity.map(r => `
+        <tr>
+          <td class="py-2 px-3 font-medium">${r.model_variant}</td>
+          <td class="py-2 px-3">${r.spearman_r_batters}</td>
+          <td class="py-2 px-3">${r.spearman_r_bowlers}</td>
+          <td class="py-2 px-3">${r.top10_bat_overlap} / ${r.top10_bowl_overlap}</td>
+        </tr>
+      `).join('');
+    }
+
+    function updateSpotlight(p) {
+      if (!p) return;
+      const isBat = ROLE === 'batters';
+      document.getElementById('sp-rank').textContent = `#${p.rank}`;
+      document.getElementById('sp-name').textContent = p.unstop_dropdown_name;
+      document.getElementById('sp-sub').textContent = `${p.balls_hp} HP balls • ${isBat ? p.qual_hp_innings : p.qual_hp_spells} Qualifying HP Matches`;
+      document.getElementById('sp-score').textContent = (isBat ? p.clutch_bat_score : p.clutch_bowl_score).toFixed(2);
+      document.getElementById('sp-pos').textContent = `${(isBat ? p.pos_hp_innings : p.pos_hp_spells).toFixed(1)}%`;
+      document.getElementById('sp-norm-lbl').textContent = isBat ? 'Normal SR' : 'Normal Econ';
+      document.getElementById('sp-hp-lbl').textContent = isBat ? 'High-Pressure SR' : 'High-Pressure Econ';
+      document.getElementById('sp-norm-val').textContent = (isBat ? p.sr_norm : p.econ_norm).toFixed(2);
+      document.getElementById('sp-hp-val').textContent = (isBat ? p.sr_hp : p.econ_hp).toFixed(2);
+      document.getElementById('sp-eb-norm').textContent = (p.eb_impact_norm >= 0 ? '+' : '') + p.eb_impact_norm.toFixed(2);
+      document.getElementById('sp-eb-hp').textContent = (p.eb_impact_hp >= 0 ? '+' : '') + p.eb_impact_hp.toFixed(2);
+    }
+
+    function renderAll() {
+      if (!DATA) return;
+      const isBat = ROLE === 'batters';
+      const q = document.getElementById('search-input').value.trim().toLowerCase();
+      const minB = Number(document.getElementById('min-balls').value);
+
+      const rows = DATA[ROLE].filter(r =>
+        r.balls_hp >= minB && r.unstop_dropdown_name.toLowerCase().includes(q)
+      );
+
+      if (!SELECTED_NAME && rows.length > 0) SELECTED_NAME = rows[0].unstop_dropdown_name;
+      const active = rows.find(r => r.unstop_dropdown_name === SELECTED_NAME) || rows[0];
+      updateSpotlight(active);
+
+      document.getElementById('table-title').textContent = isBat ? 'Qualified Batters Leaderboard' : 'Qualified Bowlers Leaderboard';
+      document.getElementById('table-count').textContent = `Showing ${rows.length} players`;
+      document.getElementById('chart-title').textContent = isBat
+        ? 'Batters: Normal Baseline vs. High-Pressure Impact'
+        : 'Bowlers: Normal Baseline vs. High-Pressure Impact';
+
+      // Table Head
+      document.getElementById('table-head').innerHTML = `
+        <th class="py-3 px-4">Rank</th>
+        <th class="py-3 px-4">Player (Unstop Name)</th>
+        <th class="py-3 px-4">HP Balls</th>
+        <th class="py-3 px-4">${isBat ? 'Norm SR' : 'Norm Econ'}</th>
+        <th class="py-3 px-4">${isBat ? 'HP SR' : 'HP Econ'}</th>
+        <th class="py-3 px-4">EB HP Impact</th>
+        <th class="py-3 px-4">Pos HP %</th>
+        <th class="py-3 px-4">Clutch Score</th>
+      `;
+
+      // Table Body
+      document.getElementById('table-body').innerHTML = rows.map(r => {
+        const score = isBat ? r.clutch_bat_score : r.clutch_bowl_score;
+        const pos = isBat ? r.pos_hp_innings : r.pos_hp_spells;
+        const nVal = isBat ? r.sr_norm : r.econ_norm;
+        const hVal = isBat ? r.sr_hp : r.econ_hp;
+        const isTop10 = r.rank <= 10;
+        return `
+          <tr onclick="SELECTED_NAME='${r.unstop_dropdown_name.replace(/'/g, "\\'")}'; updateSpotlight(DATA[ROLE].find(x=>x.unstop_dropdown_name===SELECTED_NAME));"
+              class="cursor-pointer hover:bg-pink-50/50 transition ${isTop10 ? 'bg-indigo-50/25' : ''}">
+            <td class="py-2.5 px-4 font-bold text-[#1E1656]">${r.rank <= 10 ? `<span class="px-2 py-0.5 rounded-full bg-[#1E1656] text-white text-xs">#${r.rank}</span>` : `#${r.rank}`}</td>
+            <td class="py-2.5 px-4 font-semibold text-slate-900">${r.unstop_dropdown_name}</td>
+            <td class="py-2.5 px-4 text-slate-600">${r.balls_hp}</td>
+            <td class="py-2.5 px-4 text-slate-600">${nVal.toFixed(2)}</td>
+            <td class="py-2.5 px-4 font-semibold text-[#E11D74]">${hVal.toFixed(2)}</td>
+            <td class="py-2.5 px-4 font-semibold ${r.eb_impact_hp >= 0 ? 'text-teal-700' : 'text-rose-600'}">${r.eb_impact_hp >= 0 ? '+' : ''}${r.eb_impact_hp.toFixed(2)}</td>
+            <td class="py-2.5 px-4 text-slate-700">${pos.toFixed(1)}%</td>
+            <td class="py-2.5 px-4 font-extrabold text-[#1E1656]">${score.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Plotly Quadrant
+      const trace = {
+        x: rows.map(r => r.eb_impact_norm),
+        y: rows.map(r => r.eb_impact_hp),
+        text: rows.map(r => `#${r.rank} ${r.unstop_dropdown_name}<br>HP Balls: ${r.balls_hp}<br>EB HP Impact: ${r.eb_impact_hp.toFixed(2)}<br>Pos HP %: ${(isBat ? r.pos_hp_innings : r.pos_hp_spells).toFixed(1)}%`),
+        hoverinfo: 'text',
+        mode: 'markers+text',
+        textposition: 'top center',
+        textfont: { size: 10, color: '#1E1656' },
+        // Only label top 10 on scatter to keep it clean
+        texttemplate: rows.map(r => r.rank <= 10 ? `#${r.rank} ${r.unstop_dropdown_name}` : ''),
+        marker: {
+          size: rows.map(r => Math.max(9, Math.sqrt(r.balls_hp) * 1.15)),
+          color: rows.map(r => isBat ? r.pos_hp_innings : r.pos_hp_spells),
+          colorscale: 'YlGnBu',
+          reversescale: true,
+          showscale: true,
+          colorbar: { title: 'Pos HP %', thickness: 12 },
+          line: { color: rows.map(r => r.rank <= 10 ? '#1E1656' : '#64748B'), width: rows.map(r => r.rank <= 10 ? 2 : 0.8) }
+        }
+      };
+
+      const minV = Math.min(...rows.map(r => Math.min(r.eb_impact_norm, r.eb_impact_hp)), -10);
+      const maxV = Math.max(...rows.map(r => Math.max(r.eb_impact_norm, r.eb_impact_hp)), 35);
+      const parity = {
+        x: [minV, maxV], y: [minV, maxV],
+        mode: 'lines', line: { dash: 'dot', color: '#E11D74', width: 1.5 },
+        hoverinfo: 'none', showlegend: false
+      };
+
+      Plotly.newPlot('quadrant-plot', [parity, trace], {
+        margin: { t: 20, r: 20, b: 48, l: 55 },
+        xaxis: { title: 'EB Normal Baseline Impact / 100 Balls', zeroline: true, zerolinecolor: '#CBD5E1', gridcolor: '#F1F5F9' },
+        yaxis: { title: 'EB High-Pressure Impact / 100 Balls', zeroline: true, zerolinecolor: '#CBD5E1', gridcolor: '#F1F5F9' },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        showlegend: false
+      }, { responsive: true, displayModeBar: false });
+
+      document.getElementById('quadrant-plot').on('plotly_click', function(ev) {
+        if (ev.points && ev.points[0] && ev.points[0].curveNumber === 1) {
+          const idx = ev.points[0].pointIndex;
+          SELECTED_NAME = rows[idx].unstop_dropdown_name;
+          updateSpotlight(rows[idx]);
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
